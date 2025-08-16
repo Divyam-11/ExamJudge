@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Examiner's Dashboard</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Socket.IO client library to connect to the server -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+            rel="stylesheet"
+    />
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f3f4f6;
+        }
+        #examiner-alerts::-webkit-scrollbar {
+            width: 8px;
+        }
+        #examiner-alerts::-webkit-scrollbar-track {
+            background: #e5e7eb;
+        }
+        #examiner-alerts::-webkit-scrollbar-thumb {
+            background-color: #9ca3af;
+            border-radius: 20px;
+            border: 3px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+<div class="container mx-auto p-4 md:p-8">
+    <header class="text-center mb-10">
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-900">
+            Live Examiner Dashboard
+        </h1>
+        <p
+                id="connection-status"
+                class="text-md text-red-600 mt-2 font-semibold"
+        >
+            Connecting to server...
+        </p>
+    </header>
+
+    <div class="bg-white p-6 rounded-2xl shadow-lg max-w-4xl mx-auto">
+        <h2 class="text-2xl font-semibold mb-4 text-gray-800 border-b pb-2">
+            Real-Time Alerts
+        </h2>
+        <div
+                id="examiner-alerts"
+                class="h-96 overflow-y-auto bg-gray-50 p-4 rounded-lg space-y-3"
+        >
+            <!-- Initial message, will be replaced by alerts -->
+            <div id="no-alerts-msg" class="text-center text-gray-500 pt-16">
+                <svg
+                        class="mx-auto h-12 w-12 text-gray-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden="true"
+                >
+                    <path
+                            vector-effect="non-scaling-stroke"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">
+                    No Alerts Yet
+                </h3>
+                <p class="mt-1 text-sm text-gray-500">
+                    Waiting for activity from students...
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Configuration ---
+    // This must match the address of your Flask server.
+    const SERVER_URL = "http://192.168.1.8:5000";
+
+    // --- DOM Elements ---
+    const alertsContainer = document.getElementById("examiner-alerts");
+    const connectionStatus = document.getElementById("connection-status");
+    const noAlertsMsg = document.getElementById("no-alerts-msg");
+
+    // --- Socket.IO Connection ---
+    const socket = io(SERVER_URL);
+
+    socket.on("connect", () => {
+        console.log("Successfully connected to the monitoring server!");
+        connectionStatus.textContent = "Status: Connected";
+        connectionStatus.className =
+            "text-md text-green-600 mt-2 font-semibold";
+    });
+
+    socket.on("disconnect", () => {
+        console.log("Disconnected from the server.");
+        connectionStatus.textContent = "Status: Disconnected";
+        connectionStatus.className = "text-md text-red-600 mt-2 font-semibold";
+    });
+
+    socket.on("connect_error", (err) => {
+        console.error("Connection failed:", err.message);
+        connectionStatus.textContent =
+            "Connection Failed. Is the server running?";
+    });
+
+    // --- Alert Handling ---
+    socket.on("new_alert", (data) => {
+        console.log("New alert received:", data);
+
+        // Remove the "No Alerts" message if it's there
+        if (noAlertsMsg) {
+            noAlertsMsg.style.display = "none";
+        }
+
+        createAlert(data);
+    });
+
+    /**
+     * Creates and displays a new alert in the UI.
+     * @param {object} alertData - The data for the alert from the server.
+     */
+    // index.html
+
+    /**
+     * Creates and displays a new alert in the UI.
+     * @param {object} alertData - The data for the alert from the server.
+     */
+    function createAlert(alertData) {
+        // First, log the raw data from the server to the console for debugging
+        console.log("Data received from server:", alertData);
+
+        // A safety check to prevent errors if data is malformed
+        if (!alertData || !alertData.type) {
+            console.error("Received invalid alert data:", alertData);
+            return; // Exit the function early
+        }
+
+        const alertElement = document.createElement("div");
+        const borderColor = alertData.color
+            .replace("bg", "border")
+            .replace("-100", "-500")
+            .replace("-200", "-600");
+
+        alertElement.className = `p-4 rounded-lg shadow-sm ${alertData.color} border-l-4 ${borderColor} animate-fade-in cursor-pointer`;
+
+        // Optional hidden paste content
+        let pasteHTML = "";
+        // Check if the type contains "paste" AND if paste_content exists
+        if (
+            alertData.type.toLowerCase().includes("paste") &&
+            alertData.paste_content
+        ) {
+            pasteHTML = `
+      <div class="mt-2 hidden paste-content bg-white border border-gray-300 rounded-md p-2 text-sm text-gray-700 whitespace-pre-wrap">
+        ${alertData.paste_content}
+      </div>
+    `;
+        }
+
+        alertElement.innerHTML = `
+    <div class="flex items-start">
+        <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-${borderColor.split("-")[1]}-${
+            borderColor.split("-")[2]
+        }"
+                 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                 fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M8.257 3.099c.636-1.21 2.27-1.21 2.906 0l4.5 8.625c.636 1.21-.217 2.776-1.453 2.776H5.204c-1.236 0-2.089-1.566-1.453-2.776l4.5-8.625zM10 14a1 1 0 110-2 1 1 0 010 2zm0-7a1 1 0 011 1v2a1 1 0 11-2 0V8a1 1 0 011-1z" clip-rule="evenodd" />
+            </svg>
+        </div>
+        <div class="ml-3 w-full">
+            <p class="text-sm font-bold text-gray-800">${
+            alertData.student_id
+        } - ${alertData.type}</p>
+            <div class="md:flex md:justify-between">
+                <p class="text-sm text-gray-700">${alertData.message}</p>
+                <p class="mt-1 text-sm md:mt-0 md:ml-6 text-gray-500">${
+            alertData.timestamp
+        }</p>
+            </div>
+            ${pasteHTML}
+        </div>
+    </div>
+  `;
+
+        // If paste alert, toggle content on click
+        if (pasteHTML) {
+            // Only add listener if pasteHTML was created
+            alertElement.addEventListener("click", () => {
+                const pasteDiv = alertElement.querySelector(".paste-content");
+                if (pasteDiv) {
+                    pasteDiv.classList.toggle("hidden");
+                }
+            });
+        }
+
+        // Add the new alert to the top
+        alertsContainer.prepend(alertElement);
+    }
+    // Add fade-in animation style
+    const style = document.createElement("style");
+    style.innerHTML = `
+            @keyframes fade-in {
+                from { opacity: 0; transform: translateY(-10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fade-in {
+                animation: fade-in 0.5s ease-out forwards;
+            }
+        `;
+    document.head.appendChild(style);
+</script>
+</body>
+</html>

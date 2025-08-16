@@ -1,0 +1,6 @@
+Flask
+Flask-SocketIO
+requests
+pynput
+pyperclip
+pywin32
