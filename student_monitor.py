@@ -1,5 +1,5 @@
 # student_monitor_gui.py
-# A GUI application to monitor a student's activity: keystrokes, clipboard, and active window titles.
+# A cross-platform GUI application to monitor a student's activity.
 
 import tkinter as tk
 from tkinter import messagebox
@@ -8,7 +8,7 @@ import time
 import requests
 from pynput import keyboard
 import pyperclip
-import win32gui
+import pygetwindow as gw # MODIFIED: Replaced win32gui with pygetwindow
 import sys
 
 # ===== CONFIG =====
@@ -87,25 +87,26 @@ class StudentMonitor:
                 print(f"Clipboard or network error: {e}")
             time.sleep(2)
 
+    # ===== MODIFIED METHOD =====
     def _window_title_monitor(self):
-        """Monitors the active window title for banned keywords."""
+        """Monitors the active window title for banned keywords (cross-platform)."""
         last_title = ""
         while self.is_running:
             try:
-                hwnd = win32gui.GetForegroundWindow()
-                title = win32gui.GetWindowText(hwnd).lower()
-
-                if title and title != last_title:
-                    last_title = title
-                    for keyword in BANNED_KEYWORDS:
-                        if keyword in title:
-                            payload = {
-                                'student_id': self.student_id,
-                                'event_type': 'window_title',
-                                'title': win32gui.GetWindowText(hwnd) # Send original case title
-                            }
-                            requests.post(SERVER_URL, json=payload, timeout=5)
-                            break
+                active_window = gw.getActiveWindow()
+                if active_window and active_window.title:
+                    title = active_window.title.lower()
+                    if title and title != last_title:
+                        last_title = title
+                        for keyword in BANNED_KEYWORDS:
+                            if keyword in title:
+                                payload = {
+                                    'student_id': self.student_id,
+                                    'event_type': 'window_title',
+                                    'title': active_window.title # Send original case title
+                                }
+                                requests.post(SERVER_URL, json=payload, timeout=5)
+                                break
             except Exception as e:
                 print(f"Error getting window title: {e}")
             time.sleep(1)
