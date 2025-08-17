@@ -1,6 +1,9 @@
 Flask
 Flask-SocketIO
+Flask-Cors
 requests
 pynput
 pyperclip
-pywin32
+pygetwindow
+python-socketio[client]
+Werkzeug
