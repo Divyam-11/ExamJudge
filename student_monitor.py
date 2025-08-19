@@ -12,7 +12,7 @@ import pygetwindow as gw
 import socketio # <--- NEW IMPORT
 
 # ===== CONFIG =====
-SERVER_ADDRESS = 'https://84cb3cb86ca7.ngrok-free.app' # IMPORTANT: Change this to your server's network IP
+SERVER_ADDRESS = 'https://5146ce05403e.ngrok-free.app' # IMPORTANT: Change this to your server's network IP
 SERVER_URL = f'{SERVER_ADDRESS}/log'
 SEND_INTERVAL = 10
 BANNED_KEYWORDS = ["chatgpt", "gemini", "gfg", "leetcode", "stackoverflow", "chegg"]
