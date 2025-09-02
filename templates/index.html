@@ -19,8 +19,15 @@
 <body class="antialiased text-gray-800">
 <div class="container mx-auto p-4 md:p-8">
     <header class="text-center mb-10">
-        <h1 id="dashboard-title" class="text-3xl md:text-4xl font-bold text-gray-900">Live Examiner Dashboard</h1>
-        <p id="connection-status" class="text-md text-red-600 mt-2 font-semibold">Connecting to server...</p>
+        <h1 id="dashboard-title" class="text-3xl md:text-4xl font-bold text-gray-900">
+            Live Examiner Dashboard
+        </h1>
+        <p id="connection-status" class="text-md text-red-600 mt-2 font-semibold">
+            Connecting to server...
+        </p>
+        <a href="/logs/{{ room_id }}" class="mt-2 inline-block bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 text-sm font-semibold">
+            View Full Activity Log
+        </a>
     </header>
 
     <main class="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
@@ -48,7 +55,7 @@
 
 <script>
     // --- Configuration ---
-    const SERVER_URL = "https://5146ce05403e.ngrok-free.app"; // CHANGE TO YOUR SERVER IP
+    const SERVER_URL = "http://localhost:5000"; // CHANGE TO YOUR SERVER IP
     const ROOM_ID = "{{ room_id|e }}";
 
     // --- DOM Elements ---
