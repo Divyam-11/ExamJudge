@@ -15,12 +15,53 @@ ExamJudge is a client-server application designed to help examiners monitor stud
 
 ## How It Works
 
+
 The system consists of two main components:
 
 1.  **Student Monitor (`student_monitor.py`)**: A Python GUI application that students run on their local machines. It now connects to the server via Socket.IO to register presence and sends keyboard, clipboard, and window title data via HTTP POST requests.
 2.  **Server (`server.py`)**: A Flask server that uses Socket.IO to manage rooms and student connections. It receives activity data from student monitors, checks for suspicious patterns, and pushes alerts to the correct examiner dashboard.
 3.  **Examiner Dashboard (`templates/index.html`)**: A web page that connects to the server via Socket.IO to join a specific room and display a live feed of alerts and connected students.
+```mermaid
+graph TD
+    subgraph Level 1 View
+        P1[1. Manage Rooms]
+        P2[2. Monitor Student Activity]
+        P4[4. Generate Alerts]
+        P5[5. Display Dashboard]
+        DS1[D1: Database]
+    end
 
+    subgraph Process 3: Analyze Data (Expanded to Level 2)
+        style Process 3: Analyze Data (Expanded to Level 2) fill:#f9f9f9,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+
+        subgraph Level 2 Details
+            P3_1[3.1 Check Keywords]
+            P3_2[3.2 Check Paste Content]
+            P3_3[3.3 Check Window Titles]
+        end
+
+        P2 -- Raw Activity Data --> P3_1
+        P2 -- Raw Activity Data --> P3_2
+        P2 -- Raw Activity Data --> P3_3
+    end
+
+
+    Student -- Activity Data --> P2
+    Examiner -- Room Management --> P1
+
+    P3_1 -- Suspicious Keywords --> P4
+    P3_2 -- Suspicious Paste --> P4
+    P3_3 -- Suspicious Window Title --> P4
+
+    P3_1 -- Log Data --> DS1
+    P3_2 -- Log Data --> DS1
+    P3_3 -- Log Data --> DS1
+
+    P4 -- Alert Data --> P5
+    DS1 -- Log & Room Data --> P5
+
+    Examiner -- Views --> P5
+```
 ## Installation
 
 Follow these steps to set up and run the project.
