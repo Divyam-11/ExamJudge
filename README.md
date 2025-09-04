@@ -23,6 +23,11 @@ The system consists of two main components:
 3.  **Examiner Dashboard (`templates/index.html`)**: A web page that connects to the server via Socket.IO to join a specific room and display a live feed of alerts and connected students.
 ```mermaid
 graph TD
+    %% External Entities
+    Student
+    Examiner
+
+    %% Level 1 Processes
     subgraph Level 1 View
         P1[1. Manage Rooms]
         P2[2. Monitor Student Activity]
@@ -31,36 +36,31 @@ graph TD
         DS1[D1: Database]
     end
 
-    subgraph Process 3: Analyze Data (Expanded to Level 2)
-        style Process 3: Analyze Data (Expanded to Level 2) fill:#f9f9f9,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-
-        subgraph Level 2 Details
-            P3_1[3.1 Check Keywords]
-            P3_2[3.2 Check Paste Content]
-            P3_3[3.3 Check Window Titles]
-        end
-
-        P2 -- Raw Activity Data --> P3_1
-        P2 -- Raw Activity Data --> P3_2
-        P2 -- Raw Activity Data --> P3_3
+    %% Level 2 Expansion for Process 3
+    subgraph S3 [Process 3: Analyze Data]
+        P3_1[3.1 Check Keywords]
+        P3_2[3.2 Check Paste Content]
+        P3_3[3.3 Check Window Titles]
     end
 
+    %% Styling the expanded subgraph
+    style S3 fill:#f9f9f9,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
 
+    %% --- COMBINED DATA FLOWS ---
     Student -- Activity Data --> P2
     Examiner -- Room Management --> P1
+    Examiner -- Views --> P5
 
-    P3_1 -- Suspicious Keywords --> P4
-    P3_2 -- Suspicious Paste --> P4
-    P3_3 -- Suspicious Window Title --> P4
+    %% Single flow INTO the expanded process
+    P2 -- Raw Activity Data --> S3
 
-    P3_1 -- Log Data --> DS1
-    P3_2 -- Log Data --> DS1
-    P3_3 -- Log Data --> DS1
+    %% Single flows OUT of the expanded process
+    S3 -- Suspicious Activity --> P4
+    S3 -- Log Data --> DS1
 
+    %% Final Flows
     P4 -- Alert Data --> P5
     DS1 -- Log & Room Data --> P5
-
-    Examiner -- Views --> P5
 ```
 ## Installation
 
