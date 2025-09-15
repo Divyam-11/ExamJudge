@@ -21,6 +21,45 @@ The system consists of two main components:
 2.  **Server (`server.py`)**: A Flask server that uses Socket.IO to manage rooms and student connections. It receives activity data from student monitors, checks for suspicious patterns, and pushes alerts to the correct examiner dashboard.
 3.  **Examiner Dashboard (`templates/index.html`)**: A web page that connects to the server via Socket.IO to join a specific room and display a live feed of alerts and connected students.
 
+## UML Diagram
+
+```mermaid
+classDiagram
+    class Student {
+        +student_id
+        +room_id
+        +key_buffer
+        +is_running
+        +start()
+        +stop()
+        -_send_data()
+        -_on_press()
+        -_clipboard_monitor()
+        -_window_title_monitor()
+    }
+
+    class Server {
+        +app
+        +socketio
+        +room_participants
+        +log_activity()
+        +handle_join_room()
+        +handle_student_connect()
+        +handle_disconnect()
+    }
+
+    class ExaminerDashboard {
+        +socket
+        +room_id
+        +createAlert()
+        +updateStudentList()
+    }
+
+    Student -->> Server : HTTP POST /log
+    Student -->> Server : Socket.IO Events
+    Server -->> ExaminerDashboard : Socket.IO Events
+```
+
 ## Installation
 
 Follow these steps to set up and run the project.
