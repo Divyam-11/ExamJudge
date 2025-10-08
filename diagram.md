@@ -4,7 +4,7 @@
 This diagram illustrates the primary use cases for the two main actors in the ExamJudge system: the Examiner and the Student.
 
 ```mermaid
-left to right direction
+graph LR
 actor Student
 actor Examiner
 

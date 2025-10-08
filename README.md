@@ -54,7 +54,7 @@ graph TD
 This diagram shows the interactions available to the main actors of the system.
 
 ```mermaid
-left to right direction
+graph LR
 actor Student
 actor Examiner
 
