@@ -21,47 +21,47 @@ The system consists of two main components:
 1.  **Student Monitor (`student_monitor.py`)**: A Python GUI application that students run on their local machines. It now connects to the server via Socket.IO to register presence and sends keyboard, clipboard, and window title data via HTTP POST requests.
 2.  **Server (`server.py`)**: A Flask server that uses Socket.IO to manage rooms and student connections. It receives activity data from student monitors, checks for suspicious patterns, and pushes alerts to the correct examiner dashboard.
 3.  **Examiner Dashboard (`templates/index.html`)**: A web page that connects to the server via Socket.IO to join a specific room and display a live feed of alerts and connected students.
+
+# ExamJudge Use-Case Diagram
+
+This diagram illustrates the primary use cases for the two main actors in the ExamJudge system: the Examiner and the Student.
+
 ```mermaid
-graph TD
-    %% External Entities
-    Student
-    Examiner
+left to right direction
+actor Student
+actor Examiner
 
-    %% Level 1 Processes
-    subgraph Level 1 View
-        P1[1. Manage Rooms]
-        P2[2. Monitor Student Activity]
-        P4[4. Generate Alerts]
-        P5[5. Display Dashboard]
-        DS1[D1: Database]
-    end
+rectangle "ExamJudge System" {
+  usecase "Start Monitoring" as UC1
+  usecase "Send Activity Data" as UC2
+  usecase "Stop Monitoring" as UC3
+  
+  usecase "Manage Exam Rooms" as UC4
+  usecase "View Dashboard" as UC5
+  usecase "View Student List" as UC6
+  usecase "Monitor Live Alerts" as UC7
+  usecase "View Pasted Content" as UC8
+  usecase "View Historical Logs" as UC9
 
-    %% Level 2 Expansion for Process 3
-    subgraph S3 [Process 3: Analyze Data]
-        P3_1[3.1 Check Keywords]
-        P3_2[3.2 Check Paste Content]
-        P3_3[3.3 Check Window Titles]
-    end
+  Student -- UC1
+  Student -- UC3
+  UC1 ..> UC2 : <<includes>>
 
-    %% Styling the expanded subgraph
-    style S3 fill:#f9f9f9,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-
-    %% --- COMBINED DATA FLOWS ---
-    Student -- Activity Data --> P2
-    Examiner -- Room Management --> P1
-    Examiner -- Views --> P5
-
-    %% Single flow INTO the expanded process
-    P2 -- Raw Activity Data --> S3
-
-    %% Single flows OUT of the expanded process
-    S3 -- Suspicious Activity --> P4
-    S3 -- Log Data --> DS1
-
-    %% Final Flows
-    P4 -- Alert Data --> P5
-    DS1 -- Log & Room Data --> P5
+  Examiner -- UC4
+  Examiner -- UC5
+  Examiner -- UC9
+  
+  UC5 ..> UC6 : <<includes>>
+  UC5 ..> UC7 : <<includes>>
+  UC7 ..> UC8 : <<extends>>
+}
 ```
+
+## Actor Descriptions
+
+*   **Examiner**: A user (e.g., teacher, proctor) who sets up exam rooms, monitors student activity in real-time via the web dashboard, and reviews logs.
+*   **Student**: A user taking an assessment who runs the monitoring client on their local machine.
+
 ## Installation
 
 Follow these steps to set up and run the project.
