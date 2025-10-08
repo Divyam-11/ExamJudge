@@ -1,56 +1,55 @@
+
+# ExamJudge Use-Case Diagram
+
+This diagram illustrates the primary use cases for the two main actors in the ExamJudge system: the Examiner and the Student.
+
 ```mermaid
-classDiagram
-    class StudentMonitor {
-        -student_id: str
-        -room_id: str
-        -key_buffer: str
-        -is_running: bool
-        -threads: list
-        -keyboard_listener: pynput.keyboard.Listener
-        -send_timer: threading.Timer
-        -sio: socketio.Client
-        +__init__(student_id, room_id)
-        +setup_sio_events()
-        -_send_data()
-        -_on_press(key)
-        -_clipboard_monitor()
-        -_window_title_monitor()
-        +start()
-        +stop()
-    }
+left to right direction
+actor Student
+actor Examiner
 
-    class App {
-        -monitor_instance: StudentMonitor
-        +__init__()
-        +create_widgets()
-        +start_monitoring()
-        +stop_monitoring()
-        +_on_closing()
-    }
+rectangle "ExamJudge System" {
+  usecase "Start Monitoring" as UC1
+  usecase "Send Activity Data" as UC2
+  usecase "Stop Monitoring" as UC3
+  
+  usecase "Manage Exam Rooms" as UC4
+  usecase "View Dashboard" as UC5
+  usecase "View Student List" as UC6
+  usecase "Monitor Live Alerts" as UC7
+  usecase "View Pasted Content" as UC8
+  usecase "View Historical Logs" as UC9
 
-    class Server {
-        -app: Flask
-        -socketio: SocketIO
-        -room_participants: dict
-        +emit_student_list(room)
-        +log_to_db(timestamp, room_id, student_id, event_type, message, details)
-        +admin()
-        +delete_room(room_id)
-        +dashboard(room_id)
-        +view_logs(room_id)
-        +index()
-        +log_activity()
-        +handle_join_room(data)
-        +handle_student_connect(data)
-        +handle_disconnect()
-    }
+  Student -- UC1
+  Student -- UC3
+  UC1 ..> UC2 : <<includes>>
 
-    class Database {
-        +init_db()
-    }
-
-    App "1" -- "1" StudentMonitor : creates and manages
-    StudentMonitor "1" -- "1" Server : communicates with via HTTP and Socket.IO
-    Server "1" -- "1" Database : logs data to
-    Server "1" -- "1" App : serves dashboard to
+  Examiner -- UC4
+  Examiner -- UC5
+  Examiner -- UC9
+  
+  UC5 ..> UC6 : <<includes>>
+  UC5 ..> UC7 : <<includes>>
+  UC7 ..> UC8 : <<extends>>
+}
 ```
+
+## Actor Descriptions
+
+*   **Examiner**: A user (e.g., teacher, proctor) who sets up exam rooms, monitors student activity in real-time via the web dashboard, and reviews logs.
+*   **Student**: A user taking an assessment who runs the monitoring client on their local machine.
+
+## Use-Case Descriptions
+
+| Use Case | Description |
+| :--- | :--- |
+| **Start Monitoring** | The student launches the client application, enters their ID and the exam room ID, and begins the monitoring session. |
+| **Send Activity Data** | *Included in "Start Monitoring"*. The client automatically captures and sends keystrokes, clipboard pastes, and active window titles to the server. |
+| **Stop Monitoring** | The student manually stops the monitoring client, ending the session. |
+| **Manage Exam Rooms**| The examiner creates or deletes exam rooms through the admin panel. |
+| **View Dashboard** | The examiner opens the web dashboard for a specific room to begin monitoring. |
+| **View Student List** | *Included in "View Dashboard"*. The examiner sees a real-time list of all students currently connected to the exam room. |
+| **Monitor Live Alerts**| *Included in "View Dashboard"*. The examiner views real-time alerts for suspicious activities like banned keywords, pasting, or suspicious window titles. |
+| **View Pasted Content**| *Extends "Monitor Live Alerts"*. The examiner can optionally click on a "paste" alert to view the exact content that was pasted. |
+| **View Historical Logs**| The examiner can view a persistent log of all alerts and activities that occurred during an exam session for a specific room. |
+
