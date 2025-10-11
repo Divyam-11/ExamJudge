@@ -94,6 +94,73 @@ rectangle "ExamJudge System" {
 - **`requirements.txt`**: A list of all Python dependencies required to run the project.
 - **`credentials.json`**, **`token.json`**: Files used for Google API authentication (if integrated).
 
+## UML Diagram
+
+```mermaid
+classDiagram
+    class Student {
+        +string student_id
+        +string room_id
+        +string key_buffer
+        +bool is_running
+        +threading.Lock buffer_lock
+        +list threads
+        +keyboard.Listener keyboard_listener
+        +threading.Timer send_timer
+        +socketio.Client sio
+        +start()
+        +stop()
+        +setup_sio_events()
+        -_send_data()
+        -_on_press(key)
+        -_clipboard_monitor()
+        -_window_title_monitor()
+    }
+
+    class Server {
+        +Flask app
+        +SocketIO socketio
+        +dict room_participants
+        +get_local_ip() string
+        +emit_student_list(room)
+        +dashboard(room_id)
+        +index()
+        +log_activity()
+        +handle_join_room(data)
+        +handle_student_connect(data)
+        +handle_disconnect()
+    }
+
+    class ExaminerDashboard {
+        +Socket socket
+        +string room_id
+        +createAlert(alertData)
+        +updateStudentList(data)
+    }
+
+    Student "1" -- "1" Server : Interacts with
+    Server "1" -- "N" ExaminerDashboard : Broadcasts to
+
+    %% Notes as separate boxes
+    class StudentNote {
+        <<note>>
+        Monitors student activity and sends to server
+    }
+    class ServerNote {
+        <<note>>
+        Manages rooms, students, and alerts
+    }
+    class DashboardNote {
+        <<note>>
+        Displays real-time alerts and student list
+    }
+
+    Student .. StudentNote
+    Server .. ServerNote
+    ExaminerDashboard .. DashboardNote
+
+```
+
 ## Installation
 
 Follow these steps to set up and run the project.
@@ -157,5 +224,6 @@ As students connect, their names will appear in the "Connected Students" list. A
 
 ## Customization
 
-- **Banned Keywords**: Modify the `BANNED_KEYWORDS` list in `student_monitor.py` and `CHEATING_KEYWORDS_REGEX` in `server.py`.
-- **Server URL**: If the server is on a different machine, change the `SERVER_ADDRESS` in `student_monitor.py` to the server's IP address.
+- **Banned Keywords**: To change the keywords that trigger alerts, modify the `BANNED_KEYWORDS` list in `student_monitor.py` and the `CHEATING_KEYWORDS_REGEX` in `server.py`.
+- **Server URL**: If you deploy the server to a public address, update the `SERVER_ADDRESS` constant in `student_monitor.py` and the `socket` connection URL in `templates/index.html`.
+- **Styling**: The dashboard's appearance can be modified by editing the Tailwind CSS classes in `templates/index.html`.

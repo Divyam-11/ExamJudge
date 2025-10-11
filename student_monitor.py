@@ -34,6 +34,8 @@ ENROLLMENT_COLUMN = 'ENROLLMENTNO'
 SUBSECTION_COLUMN = 'Sub Section'
 # ==============================================================================
 
+# ===== CONFIG =====
+SERVER_ADDRESS = 'http://127.0.0.1:5000' # IMPORTANT: Change this to your server's network IP # IMPORTANT: Change this to your server's network IP
 SERVER_URL = f'{SERVER_ADDRESS}/log'
 SEND_INTERVAL = 10
 BANNED_KEYWORDS = ["chatgpt", "gemini", "gfg", "leetcode", "stackoverflow", "chegg"]
