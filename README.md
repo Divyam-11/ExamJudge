@@ -1,25 +1,98 @@
 # ExamJudge: Real-Time Student Monitoring System
 
-ExamJudge is a client-server application designed to help examiners monitor students during online assessments. It now supports room-based monitoring, allowing multiple exams to be managed from a single server. It tracks student activity—keystrokes, clipboard usage, and application window titles—and sends real-time alerts to a centralized dashboard if any suspicious behavior is detected.
+ExamJudge is a client-server application designed to help examiners monitor students during online assessments. It supports room-based monitoring, tracks student activity—keystrokes, clipboard usage, and application window titles—and sends real-time alerts to a centralized dashboard if any suspicious behavior is detected.
 
 ## Features
 
-- **Multi-Room Monitoring**: Create unique rooms for different exams. Each room has its own dashboard and student list.
-- **Live Student Presence**: The dashboard displays a real-time list of all students connected to a specific exam room.
-- **Real-Time Alerts**: The examiner's dashboard updates in real-time with alerts for suspicious activities.
+- **Multi-Room Monitoring**: Create unique rooms for different exams, each with its own dashboard.
+- **Live Student Presence**: See a real-time list of all students connected to an exam room.
+- **Real-Time Alerts**: The dashboard updates instantly with alerts for suspicious activities.
 - **Keystroke Analysis**: Detects when students type keywords related to cheating (e.g., "chatgpt", "stackoverflow").
-- **Clipboard Monitoring**: Flags instances of copied and pasted content, with special alerts for large amounts of pasted text.
-- **Suspicious Window Detection**: Alerts examiners if a student opens a window with a title containing banned keywords.
-- **Simple GUI**: The student-side client is a simple Tkinter application that is easy to run.
-- **Web-Based Dashboard**: The examiner's dashboard is a clean, modern web interface that can be accessed from any device on the same network.
+- **Clipboard Monitoring**: Flags copy-paste events, with special alerts for large pastes.
+- **Suspicious Window Detection**: Alerts if a student opens a window with a title containing banned keywords.
+- **Web-Based Dashboard**: A clean, modern web interface for examiners.
+- **Simple Student Client**: A lightweight GUI application for students that is easy to run.
 
-## How It Works
+## System Architecture
 
-The system consists of two main components:
+The following diagram illustrates the flow of data between the components of the ExamJudge system.
 
-1.  **Student Monitor (`student_monitor.py`)**: A Python GUI application that students run on their local machines. It now connects to the server via Socket.IO to register presence and sends keyboard, clipboard, and window title data via HTTP POST requests.
-2.  **Server (`server.py`)**: A Flask server that uses Socket.IO to manage rooms and student connections. It receives activity data from student monitors, checks for suspicious patterns, and pushes alerts to the correct examiner dashboard.
-3.  **Examiner Dashboard (`templates/index.html`)**: A web page that connects to the server via Socket.IO to join a specific room and display a live feed of alerts and connected students.
+```mermaid
+graph TD
+    subgraph User Layer
+        Student
+        Examiner
+    end
+
+    subgraph Application Layer
+        A[Student Monitor Client]
+        B(Flask Server)
+        C{Socket.IO}
+        D[Web Dashboard]
+    end
+
+    subgraph Data Layer
+        E[SQLite Database]
+    end
+
+    Student -- Runs --> A
+    A -- Activity Data (HTTP) --> B
+    A -- Presence (Socket.IO) --> C
+
+    B -- Processes Data --> B
+    B -- Logs to --> E
+    B -- Sends Alerts (Socket.IO) --> C
+
+    C -- Updates --> D
+
+    Examiner -- Manages Rooms & Views --> D
+    D -- Displays Data from --> E
+```
+
+## Use-Case Diagram
+
+This diagram shows the interactions available to the main actors of the system.
+
+```mermaid
+graph LR
+actor Student
+actor Examiner
+
+rectangle "ExamJudge System" {
+  usecase "Start Monitoring" as UC1
+  usecase "Send Activity Data" as UC2
+  usecase "Stop Monitoring" as UC3
+  
+  usecase "Manage Exam Rooms" as UC4
+  usecase "View Dashboard" as UC5
+  usecase "View Student List" as UC6
+  usecase "Monitor Live Alerts" as UC7
+  usecase "View Pasted Content" as UC8
+  usecase "View Historical Logs" as UC9
+
+  Student -- UC1
+  Student -- UC3
+  UC1 ..> UC2 : <<includes>>
+
+  Examiner -- UC4
+  Examiner -- UC5
+  Examiner -- UC9
+  
+  UC5 ..> UC6 : <<includes>>
+  UC5 ..> UC7 : <<includes>>
+  UC7 ..> UC8 : <<extends>>
+}
+```
+
+## Project Structure
+
+- **`server.py`**: The main Flask server that handles HTTP requests, manages Socket.IO connections, and processes incoming data from student monitors.
+- **`student_monitor.py`**: The client-side application that students run. It monitors activity and sends data to the server.
+- **`database.py`**: Contains functions for initializing the SQLite database and logging events.
+- **`templates/`**: Holds the HTML files for the web dashboard and admin panel.
+- **`monitoring.db`**: The SQLite database file where all monitoring data is stored.
+- **`requirements.txt`**: A list of all Python dependencies required to run the project.
+- **`credentials.json`**, **`token.json`**: Files used for Google API authentication (if integrated).
 
 ## UML Diagram
 
@@ -99,8 +172,6 @@ Follow these steps to set up and run the project.
 
 ### 1. Clone the Repository
 
-First, clone this repository to your local machine or download the source code.
-
 ```bash
 git clone <repository-url>
 cd ExamJudge
@@ -108,7 +179,7 @@ cd ExamJudge
 
 ### 2. Install Dependencies
 
-The project requires several Python libraries. You can install them all with a single command:
+Install the required Python libraries using `requirements.txt`.
 
 ```bash
 pip install -r requirements.txt
@@ -118,24 +189,22 @@ pip install -r requirements.txt
 
 ### Step 1: Start the Server
 
-First, run the Flask server. This will start the backend that listens for data from the student monitors.
+Run the Flask server. This will start the backend that listens for data from the student monitors.
 
 ```bash
 python server.py
 ```
 
-When the server starts, it will print the URL for the examiner's dashboard. It will look something like this:
-
+The server will print the URLs for the admin panel and a template for the dashboard:
 ```
 =====================================================
           SERVER IS STARTING
- 🖥️  Examiner Dashboard URL: http://192.168.1.8:5000/dashboard/<your_room_id>
+ 🔑 Admin Panel URL: http://127.0.0.1:5000/admin
+ 🖥️  Dashboard URL: http://127.0.0.1:5000/dashboard/<room_id>
 =====================================================
 ```
-
-- **Choose a unique `room_id`** for your exam (e.g., `final_exam_math_101`).
-- **Open the Examiner Dashboard URL** in a web browser, replacing `<your_room_id>` with your chosen ID. For example: `http://192.168.1.8:5000/dashboard/final_exam_math_101`.
-- **Keep this server running** throughout the examination.
+- First, go to the **Admin Panel** to create a unique `room_id` for your exam.
+- Then, open the **Dashboard URL** in a web browser, replacing `<your_room_id>` with the ID you created.
 
 ### Step 2: Run the Student Monitor
 
@@ -145,25 +214,13 @@ On each student's computer, run the `student_monitor.py` script.
 python student_monitor.py
 ```
 
-This will open a small GUI application with the following fields:
-
-1.  **Exam Room ID**: Enter the **exact same room ID** you chose for the dashboard.
-2.  **Student ID**: Enter a unique identifier for the student (e.g., "student_001", "john_doe").
-3.  **Start Monitoring**: Click this button to begin monitoring. The status will change to "Monitoring" and the buttons will be disabled.
-4.  **Stop Monitoring**: This button becomes active once monitoring starts. Click it to stop the client.
-
-**Important**:
-- The `SERVER_ADDRESS` in `student_monitor.py` is currently set to `http://127.0.0.1:5000`. If the server is running on a different machine, you **must** change this URL to the server's local IP address (e.g., `http://192.168.1.8:5000`).
-- The student client must be able to reach the server over the network.
+This opens a small GUI application. The student must enter:
+1.  **Exam Room ID**: The exact same room ID created by the examiner.
+2.  **Student ID**: A unique identifier (e.g., "student_001").
 
 ### Step 3: Monitor the Dashboard
 
-As students connect and start working, their names will appear in the "Connected Students" list on the dashboard. Any suspicious activity will appear as an alert in real-time. Alerts are color-coded for severity:
-- **Orange**: A suspicious keyword was typed.
-- **Red**: Content was pasted from the clipboard.
-- **Blue**: A window with a suspicious title was opened.
-
-For paste alerts, you can click on the alert to view the content that was pasted.
+As students connect, their names will appear in the "Connected Students" list. Any suspicious activity will appear as a color-coded alert in real-time.
 
 ## Customization
 
