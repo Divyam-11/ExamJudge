@@ -83,7 +83,7 @@
         connectionStatus.className = "text-md text-red-600 mt-2 font-semibold";
     });
 
-    // --- NEW: Student List Handler ---
+    // --- MODIFIED: Student List Handler ---
     socket.on("update_student_list", (data) => {
         const students = data.students || [];
         console.log("Received student list update:", students);
@@ -97,10 +97,11 @@
             li.className = 'text-gray-500';
             studentList.appendChild(li);
         } else {
-            students.forEach(studentId => {
+            // The server now sends a formatted string for each student
+            students.forEach(studentInfo => {
                 const li = document.createElement('li');
                 li.className = 'p-2 rounded-md bg-green-50 border border-green-200 text-green-800 font-medium';
-                li.textContent = studentId;
+                li.textContent = studentInfo; // Display the formatted string directly
                 studentList.appendChild(li);
             });
         }
