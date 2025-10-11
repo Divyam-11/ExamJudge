@@ -84,6 +84,16 @@ rectangle "ExamJudge System" {
 }
 ```
 
+## Project Structure
+
+- **`server.py`**: The main Flask server that handles HTTP requests, manages Socket.IO connections, and processes incoming data from student monitors.
+- **`student_monitor.py`**: The client-side application that students run. It monitors activity and sends data to the server.
+- **`database.py`**: Contains functions for initializing the SQLite database and logging events.
+- **`templates/`**: Holds the HTML files for the web dashboard and admin panel.
+- **`monitoring.db`**: The SQLite database file where all monitoring data is stored.
+- **`requirements.txt`**: A list of all Python dependencies required to run the project.
+- **`credentials.json`**, **`token.json`**: Files used for Google API authentication (if integrated).
+
 ## Installation
 
 Follow these steps to set up and run the project.

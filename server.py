@@ -1,8 +1,9 @@
 # server.py
-# Now logs student join and leave events and emits them to the dashboard.
+# Now serves the built React application and the API from one place.
 
+import os
 import sqlite3
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, join_room, emit
 from flask_cors import CORS
 import re
@@ -11,17 +12,22 @@ import database
 
 # --- App Initialization & DB Setup ---
 database.init_db()
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-very-secret-key!'
-CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
-socketio = SocketIO(app, cors_allowed_origins="http://localhost:5173")
+
+# --- MODIFIED: Flask App Initialization for serving React ---
+# The 'dist' folder is where your built React app lives.
+app = Flask(__name__, static_folder='dist')
+
+# Since the frontend and backend are on the same server, CORS is simpler.
+# We still allow all origins for the API and log endpoints for flexibility.
+CORS(app, resources={r"/api/*": {"origins": "*"}, r"/log": {"origins": "*"}})
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # --- Constants & State Management (Unchanged) ---
 CHEATING_KEYWORDS_REGEX = re.compile(r'chatgpt|gemini|gfg|leetcode|stackoverflow|chegg', re.IGNORECASE)
 HIGH_CHAR_PASTE_THRESHOLD = 100
 room_participants = {}
 
-# --- Helper to broadcast student list ---
+# --- Helper to broadcast student list (Unchanged) ---
 def emit_student_list(room):
     student_list = []
     if room in room_participants:
@@ -43,6 +49,7 @@ def log_to_db(timestamp, room_id, student_id, event_type, message, details=""):
     except Exception as e: print(f"Database logging error: {e}")
 
 # --- API Endpoints (Unchanged) ---
+# All your /api/... routes remain exactly the same.
 @app.route('/api/rooms', methods=['GET'])
 def get_rooms():
     conn = sqlite3.connect('monitoring.db'); cursor = conn.cursor()
@@ -87,6 +94,7 @@ def log_activity():
     alert_data = {'student_id': f"{student_details.get('name', 'Unknown')} ({student_details.get('enrollment', 'N/A')})", 'timestamp': timestamp.split(" ")[1]}
     log_details = f"Name: {student_details.get('name')}, Roll: {student_details.get('enrollment')}, Subsection: {student_details.get('subsection', 'N/A')}"
 
+    # Logic for handling different event types (keystroke, paste, etc.) is unchanged
     if event_type == 'keystroke':
         keystrokes = data.get('keystrokes', '')
         found_keywords = CHEATING_KEYWORDS_REGEX.findall(keystrokes)
@@ -113,10 +121,8 @@ def log_activity():
 
     return jsonify({"status": "success"}), 200
 
-# ==============================================================================
-# ===== MODIFIED: Socket.IO Events =====
-# ==============================================================================
-
+# --- Socket.IO Events (Unchanged) ---
+# All your socket.io handlers remain the same.
 @socketio.on('join_room')
 def handle_join_room(data):
     room = data['room_id']
@@ -130,19 +136,13 @@ def handle_student_connect(data):
     sid = request.sid
     if room not in room_participants:
         room_participants[room] = {}
-
     room_participants[room][sid] = student_details
     student_name = student_details.get('name', 'Unknown')
     student_email = student_details.get('email', 'N/A')
-
     print(f"Student '{student_name}' connected to room '{room}'.")
     emit_student_list(room)
-
-    # Log to DB
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     log_to_db(timestamp, room, student_email, 'Connection', 'Student Joined', f"Name: {student_name}")
-
-    # Emit notification to dashboard
     socketio.emit('student_joined', {'name': student_name}, room=room)
 
 @socketio.on('disconnect')
@@ -150,7 +150,6 @@ def handle_disconnect():
     sid = request.sid
     room_to_update = None
     disconnected_student_details = None
-
     for room, participants in room_participants.items():
         if sid in participants:
             disconnected_student_details = participants.pop(sid)
@@ -158,25 +157,29 @@ def handle_disconnect():
             if not participants:
                 del room_participants[room]
             break
-
     if room_to_update and disconnected_student_details:
         student_name = disconnected_student_details.get('name', 'Unknown')
         student_email = disconnected_student_details.get('email', 'N/A')
-
         print(f"Student '{student_name}' disconnected from room '{room_to_update}'.")
         emit_student_list(room_to_update)
-
-        # Log to DB
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         log_to_db(timestamp, room_to_update, student_email, 'Connection', 'Student Left', f"Name: {student_name}")
-
-        # Emit notification to dashboard
         socketio.emit('student_left', {'name': student_name}, room=room_to_update)
+
+# --- NEW: Catch-all route to serve the React app ---
+# This must be the LAST route in your file.
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
     port = 5000
     print("=====================================================")
-    print("          API SERVER IS STARTING")
-    print(f" Backend running at: http://127.0.0.1:{port}")
+    print("      EXAMJUDGE FULL STACK SERVER IS STARTING")
+    print(f"  Application running at: http://127.0.0.1:{port}")
     print("=====================================================")
-    socketio.run(app, host='0.0.0.0', port=port, debug=True, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=port)
