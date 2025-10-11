@@ -26,7 +26,7 @@ from googleapiclient.errors import HttpError
 # ==============================================================================
 # ===== CONFIG (Unchanged) =====
 # ==============================================================================
-SERVER_ADDRESS = 'http://127.0.0.1:5000'
+SERVER_ADDRESS = 'http://144.24.111.11:5000'
 EXCEL_FILE_PATH = 'student_data.xlsx'
 EMAIL_COLUMN_NAME = 'STTIETEMAILID'
 STUDENT_NAME_COLUMN = 'STUDENTNAME'
@@ -35,7 +35,7 @@ SUBSECTION_COLUMN = 'Sub Section'
 # ==============================================================================
 
 # ===== CONFIG =====
-SERVER_ADDRESS = 'http://127.0.0.1:5000' # IMPORTANT: Change this to your server's network IP # IMPORTANT: Change this to your server's network IP
+SERVER_ADDRESS = 'http://144.24.111.11:5000' # IMPORTANT: Change this to your server's network IP # IMPORTANT: Change this to your server's network IP
 SERVER_URL = f'{SERVER_ADDRESS}/log'
 SEND_INTERVAL = 10
 BANNED_KEYWORDS = ["chatgpt", "gemini", "gfg", "leetcode", "stackoverflow", "chegg"]
