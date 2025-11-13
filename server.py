@@ -18,7 +18,8 @@ database.init_db()
 app = Flask(__name__, static_folder='dist')
 
 # Since the frontend and backend are on the same server, CORS is simpler.
-# We still allow all origins for the API and log endpoints for flexibility.
+# We still allow all origins for the API and log endpoints for flexibility.git remote -v
+
 CORS(app, resources={r"/api/*": {"origins": "*"}, r"/log": {"origins": "*"}})
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -175,9 +176,22 @@ def serve(path):
         return send_from_directory(app.static_folder, path)
     else:
         return send_from_directory(app.static_folder, 'index.html')
+# --- NEW: Gemini Chatbot API Route ---
+from chatbot import get_bot_response
+
+@app.route('/api/chatbot', methods=['POST'])
+def chatbot_reply():
+    """
+    Handles frontend chatbot messages and returns Gemini AI replies.
+    """
+    data = request.get_json()
+    user_msg = data.get("message", "")
+    bot_reply = get_bot_response(user_msg)
+    return jsonify({"reply": bot_reply})
+
 
 if __name__ == '__main__':
-    port = 5000
+    port = 5050
     print("=====================================================")
     print("      EXAMJUDGE FULL STACK SERVER IS STARTING")
     print(f"  Application running at: http://127.0.0.1:{port}")
