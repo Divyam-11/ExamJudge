@@ -2,7 +2,7 @@
 import google.generativeai as genai
 
 # Configure Gemini
-genai.configure(api_key="AIzaSyCKMMnYdEgyqu3zT45oMhWHiffUe34svLw")
+genai.configure(api_key="enter api here")
 
 # Choose a fast, smart model
 model = genai.GenerativeModel("gemini-2.5-flash")
