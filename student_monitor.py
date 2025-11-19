@@ -1,11 +1,11 @@
 # student_monitor_gui.py
-# A complete UI overhaul for a more aesthetic and user-friendly experience.
+# Final version with UI enhancements and prepared for distribution with PyInstaller.
 
 import sys
+import os
 import threading
 import time
 import requests
-import os.path
 import pandas as pd
 
 from pynput import keyboard
@@ -14,7 +14,7 @@ import pygetwindow as gw
 import socketio
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox, QStackedWidget, QHBoxLayout, QFrame
 from PyQt5.QtCore import pyqtSignal, QObject, Qt
-from PyQt5.QtGui import QFont, QIcon
+from PyQt5.QtGui import QFont
 
 # --- Google Auth Imports ---
 from google.auth.transport.requests import Request
@@ -24,22 +24,41 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 # ==============================================================================
-# ===== CONFIG (Unchanged) =====
+# ===== Helper function for PyInstaller =====
 # ==============================================================================
-SERVER_ADDRESS = 'http://144.24.111.11:5000'
-EXCEL_FILE_PATH = 'student_data.xlsx'
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+# ==============================================================================
+# ===== CONFIG - File paths now use the helper function =====
+# ==============================================================================
+# IMPORTANT: Change this to your server's network IP
+SERVER_ADDRESS = 'http://127.0.0.1:5000'
+SERVER_URL = f'{SERVER_ADDRESS}/log'
+
+# --- File Paths ---
+EXCEL_FILE_PATH = resource_path('student_data.xlsx')
+CREDENTIALS_FILE_PATH = resource_path('credentials.json')
+TOKEN_FILE_PATH = resource_path('token.json')
+
+# --- Excel Column Names ---
 EMAIL_COLUMN_NAME = 'STTIETEMAILID'
 STUDENT_NAME_COLUMN = 'STUDENTNAME'
 ENROLLMENT_COLUMN = 'ENROLLMENTNO'
 SUBSECTION_COLUMN = 'Sub Section'
-# ==============================================================================
 
-# ===== CONFIG =====
-SERVER_ADDRESS = 'http://144.24.111.11:5000' # IMPORTANT: Change this to your server's network IP # IMPORTANT: Change this to your server's network IP
-SERVER_URL = f'{SERVER_ADDRESS}/log'
+# --- Other Config ---
 SEND_INTERVAL = 10
 BANNED_KEYWORDS = ["chatgpt", "gemini", "gfg", "leetcode", "stackoverflow", "chegg"]
 SCOPES = ['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile']
+# ==============================================================================
 
 
 # --- For PyQt Signal Handling (Unchanged) ---
@@ -50,7 +69,6 @@ class MonitorSignal(QObject):
 
 # ===== MONITORING LOGIC CLASS (Unchanged) =====
 class StudentMonitor:
-    # This entire class is unchanged.
     def __init__(self, student_details, room_id, signal_emitter):
         self.student_details = student_details; self.room_id = room_id; self.key_buffer = ""; self.buffer_lock = threading.Lock()
         self.is_running = False; self.threads = []; self.keyboard_listener = None; self.send_timer = None
@@ -182,19 +200,15 @@ class App(QWidget):
         layout = QVBoxLayout(page)
         layout.setAlignment(Qt.AlignCenter)
         layout.setSpacing(20)
-
         title = QLabel("Welcome to the Exam Monitor")
         title.setFont(QFont('Segoe UI', 24, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
-
         subtitle = QLabel("Please ensure you have a stable internet connection and have closed all unauthorized applications before you begin.")
         subtitle.setWordWrap(True)
         subtitle.setAlignment(Qt.AlignCenter)
         subtitle.setStyleSheet("font-size: 16px; color: #555;")
-
         lets_go_button = QPushButton("Let's Go")
         lets_go_button.clicked.connect(lambda: self.stack.setCurrentIndex(1))
-
         layout.addStretch()
         layout.addWidget(title)
         layout.addWidget(subtitle)
@@ -209,23 +223,18 @@ class App(QWidget):
         layout.setAlignment(Qt.AlignCenter)
         layout.setContentsMargins(40, 40, 40, 40)
         layout.setSpacing(15)
-
         title = QLabel("Setup & Login")
         title.setFont(QFont('Segoe UI', 20, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
-
         layout.addWidget(title)
         layout.addSpacing(20)
-
         layout.addWidget(QLabel("Enter Exam Room ID:"))
         self.room_id_entry = QLineEdit('CS101-Final')
         layout.addWidget(self.room_id_entry)
-
         self.auth_button = QPushButton('Sign in with Google')
         self.auth_button.clicked.connect(self.authenticate_user)
         layout.addSpacing(10)
         layout.addWidget(self.auth_button, alignment=Qt.AlignCenter)
-
         self.login_status_label = QLabel("Please sign in to continue.")
         self.login_status_label.setAlignment(Qt.AlignCenter)
         self.login_status_label.setStyleSheet("color: #777;")
@@ -238,26 +247,20 @@ class App(QWidget):
         layout = QVBoxLayout(page)
         layout.setAlignment(Qt.AlignCenter)
         layout.setContentsMargins(30, 30, 30, 30)
-
-        # Profile Card
         profile_card = QFrame()
         profile_card.setObjectName("profileCard")
         profile_layout = QVBoxLayout(profile_card)
         profile_layout.setSpacing(10)
         profile_layout.setContentsMargins(25, 25, 25, 25)
-
         self.name_label = QLabel("Student Name")
         self.name_label.setFont(QFont('Segoe UI', 18, QFont.Bold))
         self.email_label = QLabel("student.email@example.com")
         self.email_label.setStyleSheet("color: #555;")
-
         separator = QFrame()
         separator.setFrameShape(QFrame.HLine)
         separator.setFrameShadow(QFrame.Sunken)
-
         self.enrollment_label = QLabel("Enrollment: 12345")
         self.subsection_label = QLabel("Sub Section: A1")
-
         profile_layout.addWidget(self.name_label)
         profile_layout.addWidget(self.email_label)
         profile_layout.addSpacing(15)
@@ -265,32 +268,24 @@ class App(QWidget):
         profile_layout.addSpacing(15)
         profile_layout.addWidget(self.enrollment_label)
         profile_layout.addWidget(self.subsection_label)
-
-        # Monitoring Status
         status_frame = QWidget()
         status_layout = QHBoxLayout(status_frame)
         status_layout.setAlignment(Qt.AlignCenter)
-
-        status_indicator = QLabel("●") # Circle character
+        status_indicator = QLabel("●")
         status_indicator.setStyleSheet("color: #2ECC71; font-size: 24px;")
-
         self.monitoring_status_label = QLabel("MONITORING ACTIVE")
         self.monitoring_status_label.setFont(QFont('Segoe UI', 16, QFont.Bold))
         self.monitoring_status_label.setStyleSheet("color: #2ECC71;")
-
         status_layout.addWidget(status_indicator)
         status_layout.addWidget(self.monitoring_status_label)
-
         self.stop_button = QPushButton("Stop Monitoring")
         self.stop_button.setStyleSheet("background-color: #E74C3C;")
         self.stop_button.clicked.connect(self.stop_monitoring)
-
         layout.addWidget(profile_card)
         layout.addSpacing(25)
         layout.addWidget(status_frame)
         layout.addSpacing(25)
         layout.addWidget(self.stop_button, alignment=Qt.AlignCenter)
-
         return page
 
     def authenticate_user(self):
@@ -300,25 +295,34 @@ class App(QWidget):
         threading.Thread(target=self._run_auth_and_lookup, daemon=True).start()
 
     def _run_auth_and_lookup(self):
-        # This backend logic is unchanged
         creds = None
-        if os.path.exists('token.json'): creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        if os.path.exists(TOKEN_FILE_PATH):
+            creds = Credentials.from_authorized_user_file(TOKEN_FILE_PATH, SCOPES)
+
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                try: creds.refresh(Request())
-                except Exception as e: self.signals.lookup_failure.emit(f"Token refresh failed: {e}"); return
+                try:
+                    creds.refresh(Request())
+                except Exception as e:
+                    self.signals.lookup_failure.emit(f"Token refresh failed: {e}"); return
             else:
                 try:
-                    if not os.path.exists('credentials.json'): self.signals.lookup_failure.emit("credentials.json not found."); return
-                    flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+                    if not os.path.exists(CREDENTIALS_FILE_PATH):
+                        self.signals.lookup_failure.emit("credentials.json not found."); return
+                    flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE_PATH, SCOPES)
                     creds = flow.run_local_server(port=0)
-                except Exception as e: self.signals.lookup_failure.emit(f"Authentication failed: {e}"); return
-            with open('token.json', 'w') as token: token.write(creds.to_json())
+                except Exception as e:
+                    self.signals.lookup_failure.emit(f"Authentication failed: {e}"); return
+            with open(TOKEN_FILE_PATH, 'w') as token:
+                token.write(creds.to_json())
+
         try:
             service = build('oauth2', 'v2', credentials=creds)
             email = service.userinfo().get().execute().get('email')
-            if not email: self.signals.lookup_failure.emit("Could not get email from Google."); return
-        except HttpError as err: self.signals.lookup_failure.emit(f"Google API Error: {err}"); return
+            if not email:
+                self.signals.lookup_failure.emit("Could not get email from Google."); return
+        except HttpError as err:
+            self.signals.lookup_failure.emit(f"Google API Error: {err}"); return
 
         self.login_status_label.setText(f"Signed in as {email}. Verifying...")
         try:
@@ -333,18 +337,17 @@ class App(QWidget):
                 })
             else:
                 self.signals.lookup_failure.emit("Email not found in student roster.")
-        except FileNotFoundError: self.signals.lookup_failure.emit(f"'{EXCEL_FILE_PATH}' not found.")
-        except Exception as e: self.signals.lookup_failure.emit(f"Could not read Excel file: {e}")
+        except FileNotFoundError:
+            self.signals.lookup_failure.emit(f"'{os.path.basename(EXCEL_FILE_PATH)}' not found.")
+        except Exception as e:
+            self.signals.lookup_failure.emit(f"Could not read Excel file: {e}")
 
     def handle_lookup_success(self, details_dict):
         self.student_details = details_dict
-        # Populate the profile page
         self.name_label.setText(self.student_details['name'])
         self.email_label.setText(self.student_details['email'])
         self.enrollment_label.setText(f"Enrollment: {self.student_details['enrollment']}")
         self.subsection_label.setText(f"Sub Section: {self.student_details['subsection']}")
-
-        # Switch to the monitoring page and start
         self.stack.setCurrentIndex(2)
         self.start_monitoring()
 
@@ -380,3 +383,4 @@ if __name__ == "__main__":
     ex = App()
     ex.show()
     sys.exit(app.exec_())
+

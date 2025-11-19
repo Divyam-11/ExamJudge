@@ -1,8 +1,11 @@
-# chatbot.py — Gemini AI trained to answer only about ExamJudge
 import google.generativeai as genai
-
+from dotenv import load_dotenv
+import os
+load_dotenv()
 # Configure Gemini
-genai.configure(api_key="enter api here")
+genai.configure(
+    api_key=os.getenv("GENAI_API_KEY")
+)
 
 # Choose a fast, smart model
 model = genai.GenerativeModel("gemini-2.5-flash")

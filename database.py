@@ -1,6 +1,3 @@
-# database.py
-# Initializes the SQLite database and tables.
-
 import sqlite3
 
 def init_db():
@@ -8,14 +5,15 @@ def init_db():
     conn = sqlite3.connect('monitoring.db')
     cursor = conn.cursor()
 
-    # Create a table to store the valid room IDs
+    # Modified: Added 'owner_id' column
     cursor.execute('''
                    CREATE TABLE IF NOT EXISTS rooms (
-                                                        id TEXT PRIMARY KEY NOT NULL
+                                                        id TEXT PRIMARY KEY NOT NULL,
+                                                        owner_id TEXT NOT NULL
                    )
                    ''')
 
-    # Create a table to log all student activities/alerts
+    # Logs table remains the same
     cursor.execute('''
                    CREATE TABLE IF NOT EXISTS logs (
                                                        id INTEGER PRIMARY KEY AUTOINCREMENT,
