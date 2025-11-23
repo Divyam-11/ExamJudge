@@ -1,6 +1,3 @@
-# server.py
-# Updated to handle 'drag_drop' events with specific styling
-
 import os
 import sqlite3
 from flask import Flask, request, jsonify, send_from_directory, g
@@ -34,6 +31,8 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # --- Constants ---
 CHEATING_KEYWORDS_REGEX = re.compile(r'chatgpt|gemini|gfg|leetcode|stackoverflow|chegg', re.IGNORECASE)
 HIGH_CHAR_PASTE_THRESHOLD = 100
+
+# STRUCTURE: room_id -> { sid -> { 'details': {...}, 'stats': {'keywords': 0, ...} } }
 room_participants = {}
 
 # --- Authentication Decorator ---
@@ -59,12 +58,20 @@ def login_required(f):
 def emit_student_list(room):
     student_list = []
     if room in room_participants:
-        for sid, details in room_participants[room].items():
-            name = details.get('name', 'Unknown')
-            enrollment = details.get('enrollment', 'N/A')
-            subsection = details.get('subsection', 'N/A')
-            student_list.append(f"{name} ({enrollment}) - Section: {subsection}")
-    socketio.emit('update_student_list', {'students': sorted(student_list)}, room=room)
+        for sid, data in room_participants[room].items():
+            # Construct a rich object for the frontend
+            student_obj = {
+                'name': data['details'].get('name', 'Unknown'),
+                'enrollment': data['details'].get('enrollment', 'N/A'),
+                'subsection': data['details'].get('subsection', 'N/A'),
+                'email': data['details'].get('email', ''),
+                'stats': data['stats']
+            }
+            student_list.append(student_obj)
+
+    # Sort by name for consistency
+    student_list.sort(key=lambda x: x['name'])
+    socketio.emit('update_student_list', {'students': student_list}, room=room)
 
 # --- Database Helper ---
 def log_to_db(timestamp, room_id, student_id, event_type, message, details=""):
@@ -92,8 +99,7 @@ def get_rooms():
 def create_room():
     data = request.get_json()
     new_room_id = data.get('roomId', '').strip()
-    if not new_room_id:
-        return jsonify({"error": "Room ID cannot be empty"}), 400
+    if not new_room_id: return jsonify({"error": "Room ID cannot be empty"}), 400
 
     conn = sqlite3.connect('monitoring.db')
     cursor = conn.cursor()
@@ -134,7 +140,7 @@ def get_logs_for_room(room_id):
     conn.close()
     return jsonify(logs)
 
-# --- Log Activity Endpoint (UPDATED) ---
+# --- Log Activity Endpoint ---
 @app.route('/log', methods=['POST'])
 def log_activity():
     data = request.get_json()
@@ -147,25 +153,48 @@ def log_activity():
     exists = cursor.fetchone()
     conn.close()
 
-    if not exists:
-        return jsonify({"status": "error", "message": "Invalid Room ID"}), 404
+    if not exists: return jsonify({"status": "error", "message": "Invalid Room ID"}), 404
 
     student_details = data.get('student_details', {})
-    student_id = student_details.get('email', 'Unknown Student')
+    student_email = student_details.get('email', '')
+    student_id_str = f"{student_details.get('name', 'Unknown')} ({student_details.get('enrollment', 'N/A')})"
     event_type = data.get('event_type')
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    alert_data = {'student_id': f"{student_details.get('name', 'Unknown')} ({student_details.get('enrollment', 'N/A')})", 'timestamp': timestamp.split(" ")[1]}
+    alert_data = {'student_id': student_id_str, 'timestamp': timestamp.split(" ")[1]}
     log_details = f"Name: {student_details.get('name')}, Roll: {student_details.get('enrollment')}, Subsection: {student_details.get('subsection', 'N/A')}"
 
+    # --- UPDATE REAL-TIME STATS ---
+    # We must find the student in the room_participants dict by email
+    stat_updated = False
+    if room_id in room_participants:
+        for sid, participant in room_participants[room_id].items():
+            if participant['details'].get('email') == student_email:
+                if event_type == 'keystroke':
+                    # Only increment if keywords were actually found
+                    keystrokes = data.get('keystrokes', '')
+                    if CHEATING_KEYWORDS_REGEX.search(keystrokes):
+                        participant['stats']['keywords'] += 1
+                        stat_updated = True
+                elif event_type == 'paste':
+                    participant['stats']['paste'] += 1
+                    stat_updated = True
+                elif event_type == 'window_title':
+                    participant['stats']['window_title'] += 1
+                    stat_updated = True
+                elif event_type == 'drag_drop':
+                    participant['stats']['drag_drop'] += 1
+                    stat_updated = True
+                break
+
+    # --- PROCESS EVENT & SEND ALERT ---
     if event_type == 'keystroke':
         keystrokes = data.get('keystrokes', '')
         found_keywords = CHEATING_KEYWORDS_REGEX.findall(keystrokes)
         for keyword in set(found_keywords):
             message = f'Suspicious keyword "{keyword}" typed.'
-            # Note: 'orange' might need to be 'bg-orange-100' for proper Tailwind rendering
             alert_data.update({'type': 'Keyword Detected', 'message': f'Suspicious keyword "<strong>{keyword}</strong>" typed.', 'color': 'bg-orange-100'})
             socketio.emit('new_alert', alert_data, room=room_id)
-            log_to_db(timestamp, room_id, student_id, 'Keyword Detected', message, details=f"Keyword: {keyword}. {log_details}")
+            log_to_db(timestamp, room_id, student_email, 'Keyword Detected', message, details=f"Keyword: {keyword}. {log_details}")
 
     elif event_type == 'paste':
         pasted_content = data.get('pasted_content', '')
@@ -175,16 +204,15 @@ def log_activity():
         message = f'Pasted {pasted_length} characters.'
         alert_data.update({'type': alert_type, 'message': message, 'color': 'bg-red-100', 'paste_content': pasted_content})
         socketio.emit('new_alert', alert_data, room=room_id)
-        log_to_db(timestamp, room_id, student_id, alert_type, message, details=f"{pasted_content[:500]}... {log_details}")
+        log_to_db(timestamp, room_id, student_email, alert_type, message, details=f"{pasted_content[:500]}... {log_details}")
 
     elif event_type == 'window_title':
         title = data.get('title', '')
         message = f'Suspicious window opened: {title}'
         alert_data.update({'type': 'Suspicious Window', 'message': f'Active window: <strong>{title}</strong>', 'color': 'bg-blue-100'})
         socketio.emit('new_alert', alert_data, room=room_id)
-        log_to_db(timestamp, room_id, student_id, 'Suspicious Window', message, details=f"Window Title: {title}. {log_details}")
+        log_to_db(timestamp, room_id, student_email, 'Suspicious Window', message, details=f"Window Title: {title}. {log_details}")
 
-    # --- NEW: Drag & Drop Handler ---
     elif event_type == 'drag_drop':
         source = data.get('source_window', 'Unknown')
         dest = data.get('destination_window', 'Unknown')
@@ -192,10 +220,14 @@ def log_activity():
         alert_data.update({
             'type': 'Drag & Drop Detected',
             'message': message,
-            'color': 'bg-purple-100'  # Purple alerts for Drag & Drop
+            'color': 'bg-purple-100'
         })
         socketio.emit('new_alert', alert_data, room=room_id)
-        log_to_db(timestamp, room_id, student_id, 'Drag & Drop', f"Drag from {source} to {dest}", details=log_details)
+        log_to_db(timestamp, room_id, student_email, 'Drag & Drop', f"Drag from {source} to {dest}", details=log_details)
+
+    # If stats changed, broadcast the updated list to frontend
+    if stat_updated:
+        emit_student_list(room_id)
 
     return jsonify({"status": "success"}), 200
 
@@ -214,12 +246,24 @@ def handle_student_connect(data):
 
     if room not in room_participants:
         room_participants[room] = {}
-    room_participants[room][sid] = student_details
+
+    # NEW: Initialize stats
+    room_participants[room][sid] = {
+        'details': student_details,
+        'stats': {
+            'keywords': 0,
+            'paste': 0,
+            'window_title': 0,
+            'drag_drop': 0
+        }
+    }
 
     student_name = student_details.get('name', 'Unknown')
     student_email = student_details.get('email', 'N/A')
     print(f"Student '{student_name}' connected to room '{room}'.")
+
     emit_student_list(room)
+
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     log_to_db(timestamp, room, student_email, 'Connection', 'Student Joined', f"Name: {student_name}")
     socketio.emit('student_joined', {'name': student_name}, room=room)
@@ -228,19 +272,25 @@ def handle_student_connect(data):
 def handle_disconnect():
     sid = request.sid
     room_to_update = None
-    disconnected_student_details = None
+    disconnected_student_data = None
+
     for room, participants in room_participants.items():
         if sid in participants:
-            disconnected_student_details = participants.pop(sid)
+            disconnected_student_data = participants.pop(sid) # Remove the whole object
             room_to_update = room
             if not participants:
                 del room_participants[room]
             break
-    if room_to_update and disconnected_student_details:
-        student_name = disconnected_student_details.get('name', 'Unknown')
-        student_email = disconnected_student_details.get('email', 'N/A')
+
+    if room_to_update and disconnected_student_data:
+        # Access details from the nested dictionary
+        details = disconnected_student_data.get('details', {})
+        student_name = details.get('name', 'Unknown')
+        student_email = details.get('email', 'N/A')
+
         print(f"Student '{student_name}' disconnected from room '{room_to_update}'.")
         emit_student_list(room_to_update)
+
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         log_to_db(timestamp, room_to_update, student_email, 'Connection', 'Student Left', f"Name: {student_name}")
         socketio.emit('student_left', {'name': student_name}, room=room_to_update)
@@ -269,5 +319,4 @@ if __name__ == '__main__':
     print("      EXAMJUDGE FULL STACK SERVER IS STARTING")
     print(f"  Application running at: http://127.0.0.1:{port}")
     print("=====================================================")
-
     socketio.run(app, host='0.0.0.0', port=port)
