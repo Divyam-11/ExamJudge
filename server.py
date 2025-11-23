@@ -1,3 +1,6 @@
+# server.py
+# Updated to handle 'drag_drop' events with specific styling
+
 import os
 import sqlite3
 from flask import Flask, request, jsonify, send_from_directory, g
@@ -8,15 +11,14 @@ from datetime import datetime
 import database
 from functools import wraps
 
-# --- NEW: Firebase Imports ---
+# --- Firebase Imports ---
 import firebase_admin
 from firebase_admin import credentials, auth
 
 # --- App Initialization & DB Setup ---
 database.init_db()
 
-# --- NEW: Initialize Firebase Admin ---
-# Ensure you have 'serviceAccountKey.json' in your project folder
+# --- Initialize Firebase Admin ---
 try:
     cred = credentials.Certificate("serviceAccountKey.json")
     firebase_admin.initialize_app(cred)
@@ -29,12 +31,12 @@ app = Flask(__name__, static_folder='dist')
 CORS(app, resources={r"/api/*": {"origins": "*"}, r"/log": {"origins": "*"}})
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# --- Constants (Unchanged) ---
+# --- Constants ---
 CHEATING_KEYWORDS_REGEX = re.compile(r'chatgpt|gemini|gfg|leetcode|stackoverflow|chegg', re.IGNORECASE)
 HIGH_CHAR_PASTE_THRESHOLD = 100
 room_participants = {}
 
-# --- NEW: Authentication Decorator ---
+# --- Authentication Decorator ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -44,9 +46,7 @@ def login_required(f):
 
         token = auth_header.split("Bearer ")[1]
         try:
-            # Verify the token with Firebase
             decoded_token = auth.verify_id_token(token)
-            # Store user info in Flask's global 'g' object
             g.user_id = decoded_token['uid']
             g.user_email = decoded_token.get('email', '')
         except Exception as e:
@@ -55,7 +55,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# --- Helper to broadcast student list (Unchanged) ---
+# --- Helper to broadcast student list ---
 def emit_student_list(room):
     student_list = []
     if room in room_participants:
@@ -66,7 +66,7 @@ def emit_student_list(room):
             student_list.append(f"{name} ({enrollment}) - Section: {subsection}")
     socketio.emit('update_student_list', {'students': sorted(student_list)}, room=room)
 
-# --- Database Helper (Unchanged) ---
+# --- Database Helper ---
 def log_to_db(timestamp, room_id, student_id, event_type, message, details=""):
     try:
         conn = sqlite3.connect('monitoring.db')
@@ -76,12 +76,10 @@ def log_to_db(timestamp, room_id, student_id, event_type, message, details=""):
         conn.close()
     except Exception as e: print(f"Database logging error: {e}")
 
-# --- UPDATED API Endpoints ---
-
+# --- API Endpoints ---
 @app.route('/api/rooms', methods=['GET'])
-@login_required  # Protect this route
+@login_required
 def get_rooms():
-    # Only fetch rooms owned by the current user
     conn = sqlite3.connect('monitoring.db')
     cursor = conn.cursor()
     cursor.execute('SELECT id FROM rooms WHERE owner_id = ? ORDER BY id', (g.user_id,))
@@ -90,7 +88,7 @@ def get_rooms():
     return jsonify(rooms)
 
 @app.route('/api/rooms', methods=['POST'])
-@login_required  # Protect this route
+@login_required
 def create_room():
     data = request.get_json()
     new_room_id = data.get('roomId', '').strip()
@@ -100,7 +98,6 @@ def create_room():
     conn = sqlite3.connect('monitoring.db')
     cursor = conn.cursor()
     try:
-        # Store the creator's UID along with the room ID
         cursor.execute('INSERT INTO rooms (id, owner_id) VALUES (?, ?)', (new_room_id, g.user_id))
         conn.commit()
     except sqlite3.IntegrityError:
@@ -110,49 +107,39 @@ def create_room():
     return jsonify({"message": "Room created successfully"}), 201
 
 @app.route('/api/rooms/<room_id>', methods=['DELETE'])
-@login_required  # Protect this route
+@login_required
 def api_delete_room(room_id):
     conn = sqlite3.connect('monitoring.db')
     cursor = conn.cursor()
-
-    # Ensure only the owner can delete the room
     cursor.execute('DELETE FROM rooms WHERE id = ? AND owner_id = ?', (room_id, g.user_id))
-
     if cursor.rowcount == 0:
         conn.close()
         return jsonify({"error": "Room not found or permission denied"}), 404
-
     conn.commit()
     conn.close()
     return jsonify({"message": "Room deleted successfully"}), 200
 
 @app.route('/api/logs/<room_id>', methods=['GET'])
-@login_required  # Protect this route
+@login_required
 def get_logs_for_room(room_id):
     conn = sqlite3.connect('monitoring.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-
-    # First verify the user owns this room
     cursor.execute('SELECT 1 FROM rooms WHERE id = ? AND owner_id = ?', (room_id, g.user_id))
     if not cursor.fetchone():
         conn.close()
         return jsonify({"error": "Room not found or permission denied"}), 403
-
     cursor.execute('SELECT * FROM logs WHERE room_id = ? ORDER BY timestamp DESC', (room_id,))
     logs = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return jsonify(logs)
 
-# --- Log Activity Endpoint (Unchanged) ---
-# Students do not log in via Firebase, they join via Room ID.
-# We keep this public so the student client (Python script) can push logs.
+# --- Log Activity Endpoint (UPDATED) ---
 @app.route('/log', methods=['POST'])
 def log_activity():
     data = request.get_json()
     if not data: return jsonify({"status": "error", "message": "Invalid data"}), 400
 
-    # Validate room exists in DB before logging
     room_id = data.get('room_id', 'default_room')
     conn = sqlite3.connect('monitoring.db')
     cursor = conn.cursor()
@@ -175,33 +162,47 @@ def log_activity():
         found_keywords = CHEATING_KEYWORDS_REGEX.findall(keystrokes)
         for keyword in set(found_keywords):
             message = f'Suspicious keyword "{keyword}" typed.'
-            alert_data.update({'type': 'Keyword Detected', 'message': f'Suspicious keyword "<strong>{keyword}</strong>" typed.', 'color': 'orange'})
+            # Note: 'orange' might need to be 'bg-orange-100' for proper Tailwind rendering
+            alert_data.update({'type': 'Keyword Detected', 'message': f'Suspicious keyword "<strong>{keyword}</strong>" typed.', 'color': 'bg-orange-100'})
             socketio.emit('new_alert', alert_data, room=room_id)
             log_to_db(timestamp, room_id, student_id, 'Keyword Detected', message, details=f"Keyword: {keyword}. {log_details}")
+
     elif event_type == 'paste':
         pasted_content = data.get('pasted_content', '')
         pasted_length = len(pasted_content)
         is_high_char = pasted_length > HIGH_CHAR_PASTE_THRESHOLD
         alert_type = 'High Character Paste' if is_high_char else 'Paste Detected'
         message = f'Pasted {pasted_length} characters.'
-        alert_data.update({'type': alert_type, 'message': message, 'color': 'red', 'paste_content': pasted_content})
+        alert_data.update({'type': alert_type, 'message': message, 'color': 'bg-red-100', 'paste_content': pasted_content})
         socketio.emit('new_alert', alert_data, room=room_id)
         log_to_db(timestamp, room_id, student_id, alert_type, message, details=f"{pasted_content[:500]}... {log_details}")
+
     elif event_type == 'window_title':
         title = data.get('title', '')
         message = f'Suspicious window opened: {title}'
-        alert_data.update({'type': 'Suspicious Window', 'message': f'Active window: <strong>{title}</strong>', 'color': 'blue'})
+        alert_data.update({'type': 'Suspicious Window', 'message': f'Active window: <strong>{title}</strong>', 'color': 'bg-blue-100'})
         socketio.emit('new_alert', alert_data, room=room_id)
         log_to_db(timestamp, room_id, student_id, 'Suspicious Window', message, details=f"Window Title: {title}. {log_details}")
 
+    # --- NEW: Drag & Drop Handler ---
+    elif event_type == 'drag_drop':
+        source = data.get('source_window', 'Unknown')
+        dest = data.get('destination_window', 'Unknown')
+        message = f'Content dragged from <strong>{source}</strong> to <strong>{dest}</strong>.'
+        alert_data.update({
+            'type': 'Drag & Drop Detected',
+            'message': message,
+            'color': 'bg-purple-100'  # Purple alerts for Drag & Drop
+        })
+        socketio.emit('new_alert', alert_data, room=room_id)
+        log_to_db(timestamp, room_id, student_id, 'Drag & Drop', f"Drag from {source} to {dest}", details=log_details)
+
     return jsonify({"status": "success"}), 200
 
-# --- Socket.IO Events (Update for security optional but recommended) ---
-# For now, we keep join_room open, but ideally you should verify token on connect.
+# --- Socket.IO Events ---
 @socketio.on('join_room')
 def handle_join_room(data):
     room = data['room_id']
-    # Optional: Check if room belongs to user here if you send token via socket
     join_room(room)
     emit_student_list(room)
 
