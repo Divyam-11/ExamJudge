@@ -10,7 +10,7 @@ ExamJudge is a client-server application designed to help examiners monitor stud
 - **Keystroke Analysis**: Detects when students type keywords related to cheating (e.g., "chatgpt", "stackoverflow").
 - **Clipboard Monitoring**: Flags copy-paste events, with special alerts for large pastes.
 - **Suspicious Window Detection**: Alerts if a student opens a window with a title containing banned keywords.
-- **Web-Based Dashboard**: A clean, modern web interface for examiners.
+- **Web-Based Dashboard**: A clean, modern web interface .
 - **Simple Student Client**: A lightweight GUI application for students that is easy to run.
 
 ## System Architecture
