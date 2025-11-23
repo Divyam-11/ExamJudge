@@ -1,12 +1,12 @@
 # student_monitor_gui.py
-# Final version with UI enhancements and prepared for distribution with PyInstaller.
+# Final version with pandas removed to ensure successful distribution.
 
 import sys
 import os
 import threading
 import time
 import requests
-import pandas as pd
+import openpyxl # Replaces pandas
 
 from pynput import keyboard
 import pyperclip
@@ -29,39 +29,32 @@ from googleapiclient.errors import HttpError
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
-
     return os.path.join(base_path, relative_path)
 
 # ==============================================================================
-# ===== CONFIG - File paths now use the helper function =====
+# ===== CONFIG - Using your updated values =====
 # ==============================================================================
-# IMPORTANT: Change this to your server's network IP
-SERVER_ADDRESS = 'http://127.0.0.1:5000'
+SERVER_ADDRESS = 'http://80.225.231.12:5000'
 SERVER_URL = f'{SERVER_ADDRESS}/log'
 
-# --- File Paths ---
 EXCEL_FILE_PATH = resource_path('student_data.xlsx')
 CREDENTIALS_FILE_PATH = resource_path('credentials.json')
 TOKEN_FILE_PATH = resource_path('token.json')
 
-# --- Excel Column Names ---
 EMAIL_COLUMN_NAME = 'STTIETEMAILID'
 STUDENT_NAME_COLUMN = 'STUDENTNAME'
 ENROLLMENT_COLUMN = 'ENROLLMENTNO'
 SUBSECTION_COLUMN = 'Sub Section'
 
-# --- Other Config ---
 SEND_INTERVAL = 10
 BANNED_KEYWORDS = ["chatgpt", "gemini", "gfg", "leetcode", "stackoverflow", "chegg"]
 SCOPES = ['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile']
 # ==============================================================================
 
-
-# --- For PyQt Signal Handling (Unchanged) ---
+# --- PyQt Signal Handling (Unchanged) ---
 class MonitorSignal(QObject):
     connection_failed = pyqtSignal()
     lookup_success = pyqtSignal(dict)
@@ -69,6 +62,7 @@ class MonitorSignal(QObject):
 
 # ===== MONITORING LOGIC CLASS (Unchanged) =====
 class StudentMonitor:
+    # This entire class is unchanged.
     def __init__(self, student_details, room_id, signal_emitter):
         self.student_details = student_details; self.room_id = room_id; self.key_buffer = ""; self.buffer_lock = threading.Lock()
         self.is_running = False; self.threads = []; self.keyboard_listener = None; self.send_timer = None
@@ -144,149 +138,17 @@ class App(QWidget):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle('Exam Monitor')
-        self.setGeometry(300, 300, 450, 400)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #F0F4F8;
-                font-family: 'Segoe UI', sans-serif;
-            }
-            QLabel {
-                color: #333;
-                font-size: 14px;
-            }
-            QPushButton {
-                background-color: #4A90E2;
-                color: white;
-                font-size: 16px;
-                font-weight: bold;
-                border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                min-width: 150px;
-            }
-            QPushButton:hover {
-                background-color: #357ABD;
-            }
-            QPushButton:disabled {
-                background-color: #B0C4DE;
-            }
-            QLineEdit {
-                background-color: white;
-                border: 1px solid #DCE1E6;
-                border-radius: 8px;
-                padding: 10px;
-                font-size: 14px;
-                color: #333;
-            }
-            QFrame#profileCard {
-                background-color: white;
-                border-radius: 12px;
-                border: 1px solid #EAEFF4;
-            }
-        """)
-
-        self.stack = QStackedWidget(self)
-        self.stack.addWidget(self.create_welcome_page())
-        self.stack.addWidget(self.create_login_page())
-        self.stack.addWidget(self.create_monitoring_page())
-
-        main_layout = QVBoxLayout(self)
-        main_layout.addWidget(self.stack)
-        self.setLayout(main_layout)
-
+        # UI Styling and setup is unchanged
+        self.setWindowTitle('Exam Monitor'); self.setGeometry(300, 300, 450, 400)
+        self.setStyleSheet("""QWidget { background-color: #F0F4F8; font-family: 'Segoe UI', sans-serif; } QLabel { color: #333; font-size: 14px; } QPushButton { background-color: #4A90E2; color: white; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; padding: 12px 24px; min-width: 150px; } QPushButton:hover { background-color: #357ABD; } QPushButton:disabled { background-color: #B0C4DE; } QLineEdit { background-color: white; border: 1px solid #DCE1E6; border-radius: 8px; padding: 10px; font-size: 14px; color: #333; } QFrame#profileCard { background-color: white; border-radius: 12px; border: 1px solid #EAEFF4; }""")
+        self.stack = QStackedWidget(self); self.stack.addWidget(self.create_welcome_page()); self.stack.addWidget(self.create_login_page()); self.stack.addWidget(self.create_monitoring_page())
+        main_layout = QVBoxLayout(self); main_layout.addWidget(self.stack); self.setLayout(main_layout)
     def create_welcome_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setAlignment(Qt.AlignCenter)
-        layout.setSpacing(20)
-        title = QLabel("Welcome to the Exam Monitor")
-        title.setFont(QFont('Segoe UI', 24, QFont.Bold))
-        title.setAlignment(Qt.AlignCenter)
-        subtitle = QLabel("Please ensure you have a stable internet connection and have closed all unauthorized applications before you begin.")
-        subtitle.setWordWrap(True)
-        subtitle.setAlignment(Qt.AlignCenter)
-        subtitle.setStyleSheet("font-size: 16px; color: #555;")
-        lets_go_button = QPushButton("Let's Go")
-        lets_go_button.clicked.connect(lambda: self.stack.setCurrentIndex(1))
-        layout.addStretch()
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
-        layout.addSpacing(30)
-        layout.addWidget(lets_go_button, alignment=Qt.AlignCenter)
-        layout.addStretch()
-        return page
-
+        page = QWidget(); layout = QVBoxLayout(page); layout.setAlignment(Qt.AlignCenter); layout.setSpacing(20); title = QLabel("Welcome to the Exam Monitor"); title.setFont(QFont('Segoe UI', 24, QFont.Bold)); title.setAlignment(Qt.AlignCenter); subtitle = QLabel("Please ensure you have a stable internet connection and have closed all unauthorized applications before you begin."); subtitle.setWordWrap(True); subtitle.setAlignment(Qt.AlignCenter); subtitle.setStyleSheet("font-size: 16px; color: #555;"); lets_go_button = QPushButton("Let's Go"); lets_go_button.clicked.connect(lambda: self.stack.setCurrentIndex(1)); layout.addStretch(); layout.addWidget(title); layout.addWidget(subtitle); layout.addSpacing(30); layout.addWidget(lets_go_button, alignment=Qt.AlignCenter); layout.addStretch(); return page
     def create_login_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setAlignment(Qt.AlignCenter)
-        layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(15)
-        title = QLabel("Setup & Login")
-        title.setFont(QFont('Segoe UI', 20, QFont.Bold))
-        title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
-        layout.addSpacing(20)
-        layout.addWidget(QLabel("Enter Exam Room ID:"))
-        self.room_id_entry = QLineEdit('CS101-Final')
-        layout.addWidget(self.room_id_entry)
-        self.auth_button = QPushButton('Sign in with Google')
-        self.auth_button.clicked.connect(self.authenticate_user)
-        layout.addSpacing(10)
-        layout.addWidget(self.auth_button, alignment=Qt.AlignCenter)
-        self.login_status_label = QLabel("Please sign in to continue.")
-        self.login_status_label.setAlignment(Qt.AlignCenter)
-        self.login_status_label.setStyleSheet("color: #777;")
-        layout.addWidget(self.login_status_label)
-        layout.addStretch()
-        return page
-
+        page = QWidget(); layout = QVBoxLayout(page); layout.setAlignment(Qt.AlignCenter); layout.setContentsMargins(40, 40, 40, 40); layout.setSpacing(15); title = QLabel("Setup & Login"); title.setFont(QFont('Segoe UI', 20, QFont.Bold)); title.setAlignment(Qt.AlignCenter); layout.addWidget(title); layout.addSpacing(20); layout.addWidget(QLabel("Enter Exam Room ID:")); self.room_id_entry = QLineEdit('CS101-Final'); layout.addWidget(self.room_id_entry); self.auth_button = QPushButton('Sign in with Google'); self.auth_button.clicked.connect(self.authenticate_user); layout.addSpacing(10); layout.addWidget(self.auth_button, alignment=Qt.AlignCenter); self.login_status_label = QLabel("Please sign in to continue."); self.login_status_label.setAlignment(Qt.AlignCenter); self.login_status_label.setStyleSheet("color: #777;"); layout.addWidget(self.login_status_label); layout.addStretch(); return page
     def create_monitoring_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setAlignment(Qt.AlignCenter)
-        layout.setContentsMargins(30, 30, 30, 30)
-        profile_card = QFrame()
-        profile_card.setObjectName("profileCard")
-        profile_layout = QVBoxLayout(profile_card)
-        profile_layout.setSpacing(10)
-        profile_layout.setContentsMargins(25, 25, 25, 25)
-        self.name_label = QLabel("Student Name")
-        self.name_label.setFont(QFont('Segoe UI', 18, QFont.Bold))
-        self.email_label = QLabel("student.email@example.com")
-        self.email_label.setStyleSheet("color: #555;")
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        self.enrollment_label = QLabel("Enrollment: 12345")
-        self.subsection_label = QLabel("Sub Section: A1")
-        profile_layout.addWidget(self.name_label)
-        profile_layout.addWidget(self.email_label)
-        profile_layout.addSpacing(15)
-        profile_layout.addWidget(separator)
-        profile_layout.addSpacing(15)
-        profile_layout.addWidget(self.enrollment_label)
-        profile_layout.addWidget(self.subsection_label)
-        status_frame = QWidget()
-        status_layout = QHBoxLayout(status_frame)
-        status_layout.setAlignment(Qt.AlignCenter)
-        status_indicator = QLabel("●")
-        status_indicator.setStyleSheet("color: #2ECC71; font-size: 24px;")
-        self.monitoring_status_label = QLabel("MONITORING ACTIVE")
-        self.monitoring_status_label.setFont(QFont('Segoe UI', 16, QFont.Bold))
-        self.monitoring_status_label.setStyleSheet("color: #2ECC71;")
-        status_layout.addWidget(status_indicator)
-        status_layout.addWidget(self.monitoring_status_label)
-        self.stop_button = QPushButton("Stop Monitoring")
-        self.stop_button.setStyleSheet("background-color: #E74C3C;")
-        self.stop_button.clicked.connect(self.stop_monitoring)
-        layout.addWidget(profile_card)
-        layout.addSpacing(25)
-        layout.addWidget(status_frame)
-        layout.addSpacing(25)
-        layout.addWidget(self.stop_button, alignment=Qt.AlignCenter)
-        return page
+        page = QWidget(); layout = QVBoxLayout(page); layout.setAlignment(Qt.AlignCenter); layout.setContentsMargins(30, 30, 30, 30); profile_card = QFrame(); profile_card.setObjectName("profileCard"); profile_layout = QVBoxLayout(profile_card); profile_layout.setSpacing(10); profile_layout.setContentsMargins(25, 25, 25, 25); self.name_label = QLabel("Student Name"); self.name_label.setFont(QFont('Segoe UI', 18, QFont.Bold)); self.email_label = QLabel("student.email@example.com"); self.email_label.setStyleSheet("color: #555;"); separator = QFrame(); separator.setFrameShape(QFrame.HLine); separator.setFrameShadow(QFrame.Sunken); self.enrollment_label = QLabel("Enrollment: 12345"); self.subsection_label = QLabel("Sub Section: A1"); profile_layout.addWidget(self.name_label); profile_layout.addWidget(self.email_label); profile_layout.addSpacing(15); profile_layout.addWidget(separator); profile_layout.addSpacing(15); profile_layout.addWidget(self.enrollment_label); profile_layout.addWidget(self.subsection_label); status_frame = QWidget(); status_layout = QHBoxLayout(status_frame); status_layout.setAlignment(Qt.AlignCenter); status_indicator = QLabel("●"); status_indicator.setStyleSheet("color: #2ECC71; font-size: 24px;"); self.monitoring_status_label = QLabel("MONITORING ACTIVE"); self.monitoring_status_label.setFont(QFont('Segoe UI', 16, QFont.Bold)); self.monitoring_status_label.setStyleSheet("color: #2ECC71;"); status_layout.addWidget(status_indicator); status_layout.addWidget(self.monitoring_status_label); self.stop_button = QPushButton("Stop Monitoring"); self.stop_button.setStyleSheet("background-color: #E74C3C;"); self.stop_button.clicked.connect(self.stop_monitoring); layout.addWidget(profile_card); layout.addSpacing(25); layout.addWidget(status_frame); layout.addSpacing(25); layout.addWidget(self.stop_button, alignment=Qt.AlignCenter); return page
 
     def authenticate_user(self):
         self.login_status_label.setText("Status: Waiting for Google sign-in...")
@@ -295,83 +157,83 @@ class App(QWidget):
         threading.Thread(target=self._run_auth_and_lookup, daemon=True).start()
 
     def _run_auth_and_lookup(self):
+        # Google Auth Logic is unchanged
         creds = None
-        if os.path.exists(TOKEN_FILE_PATH):
-            creds = Credentials.from_authorized_user_file(TOKEN_FILE_PATH, SCOPES)
-
+        if os.path.exists(TOKEN_FILE_PATH): creds = Credentials.from_authorized_user_file(TOKEN_FILE_PATH, SCOPES)
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                except Exception as e:
-                    self.signals.lookup_failure.emit(f"Token refresh failed: {e}"); return
+                try: creds.refresh(Request())
+                except Exception as e: self.signals.lookup_failure.emit(f"Token refresh failed: {e}"); return
             else:
                 try:
-                    if not os.path.exists(CREDENTIALS_FILE_PATH):
-                        self.signals.lookup_failure.emit("credentials.json not found."); return
+                    if not os.path.exists(CREDENTIALS_FILE_PATH): self.signals.lookup_failure.emit("credentials.json not found."); return
                     flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE_PATH, SCOPES)
                     creds = flow.run_local_server(port=0)
-                except Exception as e:
-                    self.signals.lookup_failure.emit(f"Authentication failed: {e}"); return
-            with open(TOKEN_FILE_PATH, 'w') as token:
-                token.write(creds.to_json())
-
+                except Exception as e: self.signals.lookup_failure.emit(f"Authentication failed: {e}"); return
+            with open(TOKEN_FILE_PATH, 'w') as token: token.write(creds.to_json())
         try:
             service = build('oauth2', 'v2', credentials=creds)
             email = service.userinfo().get().execute().get('email')
-            if not email:
-                self.signals.lookup_failure.emit("Could not get email from Google."); return
-        except HttpError as err:
-            self.signals.lookup_failure.emit(f"Google API Error: {err}"); return
+            if not email: self.signals.lookup_failure.emit("Could not get email from Google."); return
+        except HttpError as err: self.signals.lookup_failure.emit(f"Google API Error: {err}"); return
 
         self.login_status_label.setText(f"Signed in as {email}. Verifying...")
+
+        # --- NEW: EXCEL LOOKUP LOGIC USING OPENPYXL ---
         try:
-            df = pd.read_excel(EXCEL_FILE_PATH)
-            df.columns = df.columns.str.strip()
-            student_row = df[df[EMAIL_COLUMN_NAME].str.lower() == email.lower()]
-            if not student_row.empty:
-                details = student_row.iloc[0]
-                self.signals.lookup_success.emit({
-                    "email": email, "name": str(details.get(STUDENT_NAME_COLUMN, '')),
-                    "enrollment": str(details.get(ENROLLMENT_COLUMN, '')), "subsection": str(details.get(SUBSECTION_COLUMN, ''))
-                })
-            else:
+            workbook = openpyxl.load_workbook(EXCEL_FILE_PATH)
+            sheet = workbook.active
+
+            # Find column indexes
+            header = [str(cell.value).strip() for cell in sheet[1]]
+            try:
+                email_col_index = header.index(EMAIL_COLUMN_NAME)
+                name_col_index = header.index(STUDENT_NAME_COLUMN)
+                enroll_col_index = header.index(ENROLLMENT_COLUMN)
+                subsection_col_index = header.index(SUBSECTION_COLUMN)
+            except ValueError as e:
+                self.signals.lookup_failure.emit(f"Column not found in Excel file: {e}")
+                return
+
+            found_student = False
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                if row[email_col_index] and row[email_col_index].lower() == email.lower():
+                    self.signals.lookup_success.emit({
+                        "email": email,
+                        "name": str(row[name_col_index]),
+                        "enrollment": str(row[enroll_col_index]),
+                        "subsection": str(row[subsection_col_index])
+                    })
+                    found_student = True
+                    break
+
+            if not found_student:
                 self.signals.lookup_failure.emit("Email not found in student roster.")
+
         except FileNotFoundError:
             self.signals.lookup_failure.emit(f"'{os.path.basename(EXCEL_FILE_PATH)}' not found.")
         except Exception as e:
-            self.signals.lookup_failure.emit(f"Could not read Excel file: {e}")
+            self.signals.lookup_failure.emit(f"Could not read Excel file. Error: {e}")
+        # --- END OF NEW LOGIC ---
 
     def handle_lookup_success(self, details_dict):
-        self.student_details = details_dict
-        self.name_label.setText(self.student_details['name'])
-        self.email_label.setText(self.student_details['email'])
-        self.enrollment_label.setText(f"Enrollment: {self.student_details['enrollment']}")
-        self.subsection_label.setText(f"Sub Section: {self.student_details['subsection']}")
-        self.stack.setCurrentIndex(2)
-        self.start_monitoring()
-
+        # This function is unchanged
+        self.student_details = details_dict; self.name_label.setText(self.student_details['name']); self.email_label.setText(self.student_details['email']); self.enrollment_label.setText(f"Enrollment: {self.student_details['enrollment']}"); self.subsection_label.setText(f"Sub Section: {self.student_details['subsection']}"); self.stack.setCurrentIndex(2); self.start_monitoring()
     def handle_lookup_failure(self, error_message):
-        QMessageBox.critical(self, "Process Failed", error_message)
-        self.login_status_label.setText("Failed. Please try again.");
-        self.login_status_label.setStyleSheet("color: #E74C3C;");
-        self.auth_button.setEnabled(True)
-
+        # This function is unchanged
+        QMessageBox.critical(self, "Process Failed", error_message); self.login_status_label.setText("Failed. Please try again."); self.login_status_label.setStyleSheet("color: #E74C3C;"); self.auth_button.setEnabled(True)
     def start_monitoring(self):
-        room_id = self.room_id_entry.text().strip()
-        self.monitor_instance = StudentMonitor(self.student_details, room_id, self.signals)
-        threading.Thread(target=self.monitor_instance.start, daemon=True).start()
-
+        # This function is unchanged
+        room_id = self.room_id_entry.text().strip(); self.monitor_instance = StudentMonitor(self.student_details, room_id, self.signals); threading.Thread(target=self.monitor_instance.start, daemon=True).start()
     def stop_monitoring(self):
+        # This function is unchanged
         if self.monitor_instance: self.monitor_instance.stop(); self.monitor_instance = None
-        self.monitoring_status_label.setText("MONITORING STOPPED")
-        self.monitoring_status_label.setStyleSheet("color: #E74C3C;")
-        self.stop_button.setEnabled(False)
-
+        self.monitoring_status_label.setText("MONITORING STOPPED"); self.monitoring_status_label.setStyleSheet("color: #E74C3C;"); self.stop_button.setEnabled(False)
     def handle_connection_failure(self):
+        # This function is unchanged
         QMessageBox.critical(self, "Connection Error", "Failed to connect to the server."); self.stop_monitoring()
-
     def closeEvent(self, event):
+        # This function is unchanged
         if self.monitor_instance and self.monitor_instance.is_running:
             reply = QMessageBox.question(self, 'Quit', "Monitoring is active. Do you want to stop it and exit?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes: self.stop_monitoring(); event.accept()
@@ -383,4 +245,6 @@ if __name__ == "__main__":
     ex = App()
     ex.show()
     sys.exit(app.exec_())
+
+
 
